@@ -1,0 +1,2 @@
+I"ð<p>After developing a runtime packer in the last post, I tinkered with anti dumping techniques using PE Header manipulation. In this post I will talk about different approaches and take a look at the commonly used dumper ExtremeDumper.</p>
+:ET

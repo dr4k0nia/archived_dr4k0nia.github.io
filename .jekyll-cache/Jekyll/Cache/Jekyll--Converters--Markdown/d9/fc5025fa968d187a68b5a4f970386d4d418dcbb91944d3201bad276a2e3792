@@ -1,0 +1,42 @@
+I"3<p>A while ago I watched a very interesting DEF CON talk called “Repsych: Psychological Warfare in Reverse Engineering” by Chris Domas. In his talk Chris talked about how one could fool and or annoy reverse engineers with some little tricks. This got me thinking what can I do in .net to annoy and or fool reverse engineers. After reading about homoglyphs I had a fun little idea.</p>
+
+<h2 id="what-are-homoglyphs">What are homoglyphs?</h2>
+<p>Homoglyphs are characters that look similar or equal to the default alphabetical characters, however they are actually from different alphabets. For our obfuscation concept, we will abuse the fact that that these characters look almost exactly like normal letters.</p>
+
+<h2 id="how-can-we-use-homoglyphs">How can we use homoglyphs?</h2>
+<p>So since the homoglyph characters look just like latin characters, we can use them to have to identical looking names that are actually different. For example we could replace the character M in the name <code class="language-plaintext highlighter-rouge">&lt;Module&gt;</code> with an M from a different alphabet.</p>
+
+<p><strong>Example:</strong></p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>//normal latin characters
+&lt;Module&gt; =&gt; &lt;Module&gt;         
+
+//replaced character M 
+&lt;Мodule&gt; =&gt; xn--&lt;odule&gt;-tig
+</code></pre></div></div>
+<p>You can check if a word contains a homoglyph character using <a href="https://www.punycoder.com/">Punnycoder</a></p>
+
+<p><img src="https://i.imgur.com/OvyKYjx.png" alt="example in dnSpy" /></p>
+
+<p>This is the example from above with a few variations of homoglyphs, as you cann see all of the names look exactly the same in dnSpy. But only the first <code class="language-plaintext highlighter-rouge">&lt;Module&gt;</code> is the real global type. An experienced reverse engineer will probably know that the first one always is the real one. However its still a funny little annoyance :) If you want to, you can do this to any name, for example <code class="language-plaintext highlighter-rouge">Main()</code>. Keep in mind this is rather a little annoyance than an actual protection.</p>
+
+<h2 id="how-to-do-it-yourself">How to do it yourself</h2>
+<ol>
+  <li><strong>Getting Homoglyphs:</strong>
+Finding the homoglyph characters yourself is annoying and takes time…
+Thankfully irongeek made a perfectly working “Homoglyph Attack Generator”, <a href="http://www.irongeek.com/homoglyph-attack-generator.php">check it out yourself!</a></li>
+  <li><strong>Renaming:</strong> For this part you will need to either write your own renamer using homoglyphs or modify an existing one like ConfuserEx (If I find some time ill release my version)</li>
+  <li><strong>Done :)</strong></li>
+</ol>
+
+<p>I hope you enjoyed this little write up, and maybe even learned something or got inspired ^^ ~drakonia</p>
+
+<h1 id="creditssources">Credits/Sources</h1>
+
+<ul>
+  <li><a href="https://www.youtube.com/watch?v=HlUe0TUHOIc">DEF CON Talk by Chris Domas</a></li>
+  <li><a href="https://www.punycoder.com/">Punyocder</a> (Tool to convert homoglyphs to encoded ascii)</li>
+  <li><a href="http://www.irongeek.com/homoglyph-attack-generator.php">Irongeeks Homoglyph Attack Generator</a></li>
+  <li><a href="https://www.wandera.com/punycode-attacks/">Concept of Punycode</a></li>
+</ul>
+
+:ET

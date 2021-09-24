@@ -1,0 +1,179 @@
+I"+�<p>Taking a detailed look at my .net executable packer Origami, specifically about the runtime and how it works. Also giving some general overview about packing executables. Basic knowledge of C# and the PE Format is recommended.</p>
+
+<h2 id="what-is-a-packer">What is a packer?</h2>
+
+<p>A packer (specifically a runtime packer) is a software that unpacks itself or a payload in memory when executed. The original idea was to make files smaller due to storage and bandwith limitations, hence why this practice is also referred to as “executable compression”. But with the present-day broad availability of mass storage and increasing bandwith this is rarely needed. Which leads to the present day were packers are mostly used to make reverse engineering more difficult or in some cases hide malicious code from static scanning.</p>
+
+<p><em>Due to the increasing malicious use of packers I decided to not include any major anti reverse engineering or stealth features. The write up will only focus on the basic concept of compressing an executable and unpacking it on runtime.</em></p>
+
+<h2 id="writing-your-own-packer">Writing your own packer</h2>
+
+<p>When I first looked into writing a packer I came accross the native packer UPX, which uses PE sections to store the packed executable data (payload). Since to my knowledge no open source .NET packers exist that tinker with PE sections. I set myself the goal to create the first open source .NET packer using PE sections. Most existing .NET packers rely on embedded resources or pre-initialized arrays for payload storage and I wanted do to something different. <em>(When I recoded Origami, I added another payload storage option besides the PE section. You can choose between debug directory and PE section now)</em></p>
+
+<p><img src="/images/sheme_blue.png" alt="shematic" /></p>
+
+<blockquote>
+  <p>For easier perception I tried to visualize my idea.</p>
+</blockquote>
+
+<h2 id="processing-the-data-and-creating-a-stub">Processing the data and creating a stub</h2>
+
+<p>We begin by parsing our input executable as raw data (bytes). For further processing we will use AsmResolver. Additionally we parse the input executable as a <code class="language-plaintext highlighter-rouge">ModuleDefinition</code> which we will later use to obtain some basic info like <code class="language-plaintext highlighter-rouge">FileCharacteristics</code>, <code class="language-plaintext highlighter-rouge">PEKind</code> etc. these values will be used for the stub creation. Furthermore we need to parse the custom attributes from the input executable and import them into the stub module.</p>
+
+<p>The next step is building the stub executable, the stub is the part of the packer that unpacks the actual packed executable in memory. To run the unpacked executable from memory I will use simple Reflection invoking. First we create a new <code class="language-plaintext highlighter-rouge">ModuleDefinition</code> and pass the following arguments: payloads module name, payloads CorLib assembly as <code class="language-plaintext highlighter-rouge">AssemblyReference</code>. Once we created the module for the stub we will apply the previously mentioned info and custom attributes from our payload module.
+<em>Code reference can be found <a href="https://github.com/dr4k0nia/Origami/blob/3131d4eb47856774618ee57a7342472d6ca2efa4/src/Packers/IPacker.cs#L33">here</a></em></p>
+
+<p>After that we will add the payload data to our stub (actually I inject the loader first but we will skip that for now, since the loader code requires a longer explanation). Before we add the payload data it will be compressed and encrypted with a single xor operation. For compression and decompression I use the .NET inbuilt <code class="language-plaintext highlighter-rouge">DeflateStream</code>. <code class="language-plaintext highlighter-rouge">&lt;br/&gt;</code>
+If the PE section mode was chosen we add a new <code class="language-plaintext highlighter-rouge">PESection</code> containing a <code class="language-plaintext highlighter-rouge">DataSegment</code> which holds our payload. The new <code class="language-plaintext highlighter-rouge">PESection</code> will be called <code class="language-plaintext highlighter-rouge">.origami</code>. The Characteristics need to include atleast the read access flag, I additonally apply the unintialized data flag.<code class="language-plaintext highlighter-rouge">&lt;br/&gt;</code>
+If the debug directory mode was chosen we clear the current debug directory and add a new <code class="language-plaintext highlighter-rouge">CustomDebugDataSegment</code> containing a <code class="language-plaintext highlighter-rouge">DataSegment</code> storing our payload instead of actual debug information. I will not go into detail explaining the code for this process as I think its fairly easy to understand, however the code references are included below if youre interested.</p>
+
+<p><em>Code reference for the PE section packer can be found <a href="https://github.com/dr4k0nia/Origami/blob/3131d4eb47856774618ee57a7342472d6ca2efa4/src/Packers/SectionPacker.cs">here</a></em><code class="language-plaintext highlighter-rouge">&lt;br/&gt;</code>
+<em>Code reference for the debug directory packer can be found <a href="https://github.com/dr4k0nia/Origami/blob/3131d4eb47856774618ee57a7342472d6ca2efa4/src/Packers/DebugDirPacker.cs">here</a></em></p>
+
+<p>Now to the step we skipped, injecting the loader code. The loader is the part that will unpack the payload at runtime.</p>
+
+<h2 id="the-pe-section-loader">The PE section loader</h2>
+
+<p>This loader code will be used together with the additional PE section mentioned in the previous paragraph. It parses the PE header on runtime to find the additional section, extract the data from it and then use it to invoke the original executable.</p>
+
+<div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code>            <span class="c1">// Call GetHINSTANCE() to obtain a handle to our module</span>
+            <span class="kt">byte</span><span class="p">*</span> <span class="n">basePtr</span> <span class="p">=</span> <span class="p">(</span><span class="kt">byte</span><span class="p">*)</span> <span class="n">Marshal</span><span class="p">.</span><span class="nf">GetHINSTANCE</span><span class="p">(</span><span class="n">Assembly</span><span class="p">.</span><span class="nf">GetCallingAssembly</span><span class="p">().</span><span class="n">ManifestModule</span><span class="p">);</span>
+
+            <span class="kt">byte</span><span class="p">*</span> <span class="n">ptr</span> <span class="p">=</span> <span class="n">basePtr</span><span class="p">;</span>
+            <span class="c1">// Parse PE header using the before obtained module handle</span>
+            <span class="c1">// Reading e_lfanew from the DOS header</span>
+            <span class="n">ptr</span> <span class="p">+=</span> <span class="p">*(</span><span class="kt">ushort</span><span class="p">*)</span> <span class="p">(</span><span class="n">ptr</span> <span class="p">+</span> <span class="m">0x3C</span><span class="p">);</span>
+
+            <span class="c1">// Reading NumberOfSections the file header</span>
+            <span class="kt">ushort</span> <span class="n">NumberOfSections</span> <span class="p">=</span> <span class="p">*(</span><span class="kt">ushort</span><span class="p">*)</span> <span class="p">(</span><span class="n">ptr</span> <span class="p">+</span> <span class="m">0x6</span><span class="p">);</span>
+
+            <span class="kt">ushort</span> <span class="n">optHeaderSize</span> <span class="p">=</span> <span class="p">*(</span><span class="kt">ushort</span><span class="p">*)</span> <span class="p">(</span><span class="n">ptr</span> <span class="p">+</span> <span class="m">0x14</span><span class="p">);</span>
+
+            <span class="n">ptr</span> <span class="p">+=</span> <span class="m">0x18</span> <span class="p">+</span> <span class="n">optHeaderSize</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>Lets look at the <code class="language-plaintext highlighter-rouge">Main</code> method which will be injected into the stub and used as its EntryPoint. First we obtain a pointer to the base of our module (<code class="language-plaintext highlighter-rouge">basePtr</code>), aka the beginning of the PE header. After we assign <code class="language-plaintext highlighter-rouge">ptr</code> the value of <code class="language-plaintext highlighter-rouge">basePtr</code>. We then use the <code class="language-plaintext highlighter-rouge">ptr</code> variable to parse the relevant information for reading the sections from the PE header. <code class="language-plaintext highlighter-rouge">&lt;br/&gt;</code>
+Then we get the value of <code class="language-plaintext highlighter-rouge">e_lfanew</code> a field defined in the DOS header which indicates the address of the new executable header. The field is located at offset <code class="language-plaintext highlighter-rouge">0x3C</code>. The value of <code class="language-plaintext highlighter-rouge">e_lfanew</code> is by default <code class="language-plaintext highlighter-rouge">0x80</code> however it doesnt have to be since there are certain cases were additional data exists between DOS header and new executable header.<code class="language-plaintext highlighter-rouge">&lt;br/&gt;</code>
+After we added the value of <code class="language-plaintext highlighter-rouge">e_lfanew</code> to <code class="language-plaintext highlighter-rouge">ptr</code> we will go on to read the field <code class="language-plaintext highlighter-rouge">NumberOfSections</code> from the new executable header we obtain that value by adding the offset <code class="language-plaintext highlighter-rouge">0x6</code> to <code class="language-plaintext highlighter-rouge">ptr</code> and casting the pointer to an unsigned short pointer, the cast is required because <code class="language-plaintext highlighter-rouge">NumberOfSections</code> is of type <code class="language-plaintext highlighter-rouge">WORD</code> which in C# equals a <code class="language-plaintext highlighter-rouge">ushort</code>. We then dereference the casted pointer to aquire the value of <code class="language-plaintext highlighter-rouge">NumberOfSections</code> from the PE header and assign the value to our local called <code class="language-plaintext highlighter-rouge">NumberOfSections</code>.<code class="language-plaintext highlighter-rouge">&lt;br/&gt;</code>
+We repeat the above described but this time we add a different offset <code class="language-plaintext highlighter-rouge">0x14</code> to obtain the value of <code class="language-plaintext highlighter-rouge">SizeOfOptionalHeader</code>. This value is needed since the optional headers size changes depending on bitness. The 32bit optional header is slightly smaller than the 64bit optional header, which means following data differs in position depending on the size of the optional header. We assign the aquired value to <code class="language-plaintext highlighter-rouge">optHeaderSize</code>
+<code class="language-plaintext highlighter-rouge">&lt;br/&gt;</code></p>
+
+<p><img src="/images/headerjump2.png" alt="header" /></p>
+
+<p>In the next step we add an offset <code class="language-plaintext highlighter-rouge">0x18</code> (size of file header) and the value of <code class="language-plaintext highlighter-rouge">optHeaderSize</code> to <code class="language-plaintext highlighter-rouge">ptr</code> basically we skip the file header and the optional header and jump to the beginning of the section table. Now we need to parse the single sections from the section table.</p>
+
+<div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">[</span><span class="nf">StructLayout</span><span class="p">(</span><span class="n">LayoutKind</span><span class="p">.</span><span class="n">Explicit</span><span class="p">)]</span>
+<span class="k">private</span> <span class="k">struct</span> <span class="nc">IMAGE_SECTION_HEADER</span>
+<span class="p">{</span>
+    <span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">0</span><span class="p">)]</span> <span class="k">public</span> <span class="k">fixed</span> <span class="kt">byte</span> <span class="n">Name</span><span class="p">[</span><span class="m">8</span><span class="p">];</span>
+    <span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">12</span><span class="p">)]</span> <span class="k">public</span> <span class="kt">uint</span> <span class="n">VirtualAddress</span><span class="p">;</span>
+    <span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">16</span><span class="p">)]</span> <span class="k">public</span> <span class="kt">uint</span> <span class="n">SizeOfRawData</span><span class="p">;</span>
+    <span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">36</span><span class="p">)]</span> <span class="k">private</span> <span class="kt">uint</span> <span class="n">Characteristics</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>This struct is used to parse the individual section headers from the section table. Each section header contains additional information about the section. However we only need a few fields from that header: Name, location in memory <code class="language-plaintext highlighter-rouge">VirtualAddress</code> and the size of the section <code class="language-plaintext highlighter-rouge">SizeOfRawData</code>. The last field <code class="language-plaintext highlighter-rouge">Characteristics</code> is not used but required to get the correct size of the struct. <em>reference for the stuct defintion can be found <a href="http://www.pinvoke.NET/default.aspx/Structures/IMAGE_SECTION_HEADER.html">here</a></em></p>
+
+<div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code>            <span class="c1">// Read section headers</span>
+            <span class="kt">var</span> <span class="n">ImageSectionHeaders</span> <span class="p">=</span> <span class="k">new</span> <span class="n">IMAGE_SECTION_HEADER</span><span class="p">[</span><span class="n">NumberOfSections</span><span class="p">];</span>
+            <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">headerNo</span> <span class="p">=</span> <span class="m">0</span><span class="p">;</span>
+                <span class="n">headerNo</span> <span class="p">&lt;</span> <span class="n">ImageSectionHeaders</span><span class="p">.</span><span class="n">Length</span><span class="p">;</span>
+                <span class="n">headerNo</span><span class="p">++)</span>
+            <span class="p">{</span>
+                <span class="n">ImageSectionHeaders</span><span class="p">[</span><span class="n">headerNo</span><span class="p">]</span> <span class="p">=</span> <span class="p">*(</span><span class="n">IMAGE_SECTION_HEADER</span><span class="p">*)</span> <span class="n">ptr</span><span class="p">;</span>
+                <span class="n">ptr</span> <span class="p">+=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">IMAGE_SECTION_HEADER</span><span class="p">);</span>
+            <span class="p">}</span>
+</code></pre></div></div>
+
+<p>The loop parses all section headers and puts them in an array <code class="language-plaintext highlighter-rouge">ImageSectionHeader</code>. To read the section header we use the previously mentioned struct as a pointer. C# accepts structs as a pointer if it only contains unmanaged types, and that is the reason for the fixed byte in the struct since a C# byte array is not an unmanaged type.</p>
+
+<div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code>            <span class="c1">// Get name of EntryPoint</span>
+            <span class="kt">string</span> <span class="n">name</span> <span class="p">=</span> <span class="n">Assembly</span><span class="p">.</span><span class="nf">GetCallingAssembly</span><span class="p">().</span><span class="n">EntryPoint</span><span class="p">.</span><span class="n">Name</span><span class="p">;</span>
+
+            <span class="c1">// Iterate through all PE sections</span>
+            <span class="k">foreach</span> <span class="p">(</span><span class="kt">var</span> <span class="n">section</span> <span class="k">in</span> <span class="n">ImageSectionHeaders</span><span class="p">)</span>
+            <span class="p">{</span>
+                <span class="c1">// Check if PE section name matches first 8 bytes of stub EntryPoint</span>
+                <span class="kt">bool</span> <span class="n">flag</span> <span class="p">=</span> <span class="k">true</span><span class="p">;</span>
+                <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">h</span> <span class="p">=</span> <span class="m">0</span><span class="p">;</span> <span class="n">h</span> <span class="p">&lt;</span> <span class="m">8</span><span class="p">;</span> <span class="n">h</span><span class="p">++)</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="n">name</span><span class="p">[</span><span class="n">h</span><span class="p">]</span> <span class="p">!=</span> <span class="p">*(</span><span class="n">section</span><span class="p">.</span><span class="n">Name</span> <span class="p">+</span> <span class="n">h</span><span class="p">))</span>
+                        <span class="n">flag</span> <span class="p">=</span> <span class="k">false</span><span class="p">;</span>
+
+                <span class="k">if</span> <span class="p">(</span><span class="n">flag</span><span class="p">)</span>
+                <span class="p">{</span>
+                    <span class="c1">// Initialize buffer using size of raw data</span>
+                    <span class="c1">// Copy data from PE section into buffer and simultaneously (un)xor it</span>
+                    <span class="kt">byte</span><span class="p">[]</span> <span class="n">buffer</span> <span class="p">=</span> <span class="k">new</span> <span class="kt">byte</span><span class="p">[</span><span class="n">section</span><span class="p">.</span><span class="n">SizeOfRawData</span><span class="p">];</span>
+                    <span class="n">basePtr</span> <span class="p">+=</span> <span class="n">section</span><span class="p">.</span><span class="n">VirtualAddress</span><span class="p">;</span>
+                    <span class="k">fixed</span> <span class="p">(</span><span class="kt">byte</span><span class="p">*</span> <span class="n">p</span> <span class="p">=</span> <span class="p">&amp;</span><span class="n">buffer</span><span class="p">[</span><span class="m">0</span><span class="p">])</span>
+                    <span class="p">{</span>
+                        <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="p">=</span> <span class="m">0</span><span class="p">;</span> <span class="n">i</span> <span class="p">&lt;</span> <span class="n">buffer</span><span class="p">.</span><span class="n">Length</span><span class="p">;</span> <span class="n">i</span><span class="p">++)</span>
+                        <span class="p">{</span>
+                            <span class="p">*(</span><span class="n">p</span> <span class="p">+</span> <span class="n">i</span><span class="p">)</span> <span class="p">=</span> <span class="p">(</span><span class="kt">byte</span><span class="p">)</span> <span class="p">(*(</span><span class="n">basePtr</span> <span class="p">+</span> <span class="n">i</span><span class="p">)</span> <span class="p">^</span> <span class="n">name</span><span class="p">[</span><span class="n">i</span> <span class="p">%</span> <span class="n">name</span><span class="p">.</span><span class="n">Length</span><span class="p">]);</span>
+                        <span class="p">}</span>
+                    <span class="p">}</span>
+                <span class="p">...</span>
+</code></pre></div></div>
+
+<p>After parsing all the section headers we aqurire the calling assemblies managed <code class="language-plaintext highlighter-rouge">EntryPoint</code> name which will be <code class="language-plaintext highlighter-rouge">.origami</code>. The name is then stored as string <code class="language-plaintext highlighter-rouge">name</code> which will be later used for xor decryption and matching the correct section. We continue by finding the section that contains our payload. We iterate through our array of section headers and check if any sections name matches <code class="language-plaintext highlighter-rouge">name</code>. If we find a matching section we use it to get the payload. First we initialize a byte array <code class="language-plaintext highlighter-rouge">buffer</code> with the <code class="language-plaintext highlighter-rouge">SizeOfRawData</code> of our matched PE section. Then we add the <code class="language-plaintext highlighter-rouge">VirtualAddress</code> of the section to <code class="language-plaintext highlighter-rouge">basePtr</code>, its important that we use <code class="language-plaintext highlighter-rouge">basePtr</code> since the <code class="language-plaintext highlighter-rouge">VirtualAddress</code> is relative to the base of the module.
+Next step is copying the data from the PE section into our buffer, using a simple byte pointer operation. Simultaneously we apply the same xor operation as during the encryption to decrypt the payload byte by byte.</p>
+
+<div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code>                    <span class="c1">// Decompress data from the buffer</span>
+                    <span class="k">using</span> <span class="nn">var</span> <span class="n">origin</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">MemoryStream</span><span class="p">(</span><span class="n">buffer</span><span class="p">);</span>
+                    <span class="k">using</span> <span class="nn">var</span> <span class="n">destination</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">MemoryStream</span><span class="p">();</span>
+                    <span class="k">using</span> <span class="nn">var</span> <span class="n">deflateStream</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">DeflateStream</span><span class="p">(</span><span class="n">origin</span><span class="p">,</span> <span class="n">CompressionMode</span><span class="p">.</span><span class="n">Decompress</span><span class="p">);</span>
+                    <span class="n">deflateStream</span><span class="p">.</span><span class="nf">CopyTo</span><span class="p">(</span><span class="n">destination</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Once we are done copying and decrypting the data we pass the buffer into a <code class="language-plaintext highlighter-rouge">MemoryStream</code> (<code class="language-plaintext highlighter-rouge">origin</code>). The <code class="language-plaintext highlighter-rouge">origin</code> stream is then passed to a <code class="language-plaintext highlighter-rouge">DeflateStream</code> with the parameter <code class="language-plaintext highlighter-rouge">CompressionMode.Decompress</code> to decompress the payload. The decompressed data is then copied from the <code class="language-plaintext highlighter-rouge">DeflateStream</code> to a new <code class="language-plaintext highlighter-rouge">MemoryStream</code> here called <code class="language-plaintext highlighter-rouge">destination</code>.</p>
+
+<p>Now in order to run the payload we need to invoke it. We pass the buffer of the <code class="language-plaintext highlighter-rouge">destination</code> stream, which is the streams content as a byte array, into an <code class="language-plaintext highlighter-rouge">Assembly.Load()</code> call. We can the locate the loaded assemblies EntryPoint and invoke it. Additionally if any commandline arguments were provided we pass them to the payload executable. <em>Code reference can be found <a href="https://github.com/dr4k0nia/Origami/blob/3131d4eb47856774618ee57a7342472d6ca2efa4/src/Runtime/PeSectionLoader.cs#L91">here</a></em></p>
+
+<h2 id="the-debug-directory-loader">The debug directory loader</h2>
+
+<p>This loader is used together with a lesser known part of the PE structure, the debug directory. It is a special data directory used to store debug information for an executable. However since the data stored in this directory can be anything we can abuse it for our packers payload.
+The code is in theory very similar to the previously described PE section loader. What changed is the part of locating the compressed data.</p>
+
+<div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code>            <span class="c1">// Call GetHINSTANCE() to obtain a handle to our module</span>
+            <span class="kt">byte</span><span class="p">*</span> <span class="n">basePtr</span> <span class="p">=</span> <span class="p">(</span><span class="kt">byte</span><span class="p">*)</span> <span class="n">Marshal</span><span class="p">.</span><span class="nf">GetHINSTANCE</span><span class="p">(</span><span class="n">Assembly</span><span class="p">.</span><span class="nf">GetCallingAssembly</span><span class="p">().</span><span class="n">ManifestModule</span><span class="p">);</span>
+
+            <span class="c1">// Parse PE header using the before obtained module handle</span>
+            <span class="c1">// Reading e_lfanew from the DOS header</span>
+            <span class="kt">byte</span><span class="p">*</span> <span class="n">ptr</span> <span class="p">=</span> <span class="n">basePtr</span> <span class="p">+</span> <span class="p">*(</span><span class="kt">uint</span><span class="p">*)</span> <span class="p">(</span><span class="n">basePtr</span> <span class="p">+</span> <span class="m">0x3C</span><span class="p">);</span>
+
+            <span class="c1">// Check the optional header magic to determine 32-bit vs 64-bit</span>
+            <span class="kt">short</span> <span class="n">optMagic</span> <span class="p">=</span> <span class="p">*(</span><span class="kt">short</span><span class="p">*)</span> <span class="p">(</span><span class="n">ptr</span> <span class="p">+</span> <span class="m">0x18</span><span class="p">);</span>
+
+            <span class="c1">// 0x20b = IMAGE_NT_OPTIONAL_HDR64_MAGIC </span>
+            <span class="kt">uint</span> <span class="n">DebugVirtualAddress</span> <span class="p">=</span> <span class="n">optMagic</span> <span class="p">!=</span> <span class="m">0x20b</span>
+                <span class="p">?</span> <span class="p">*(</span><span class="kt">uint</span><span class="p">*)</span> <span class="p">(</span><span class="n">ptr</span> <span class="p">+</span> <span class="m">0xA8</span><span class="p">)</span>
+                <span class="p">:</span> <span class="p">*(</span><span class="kt">uint</span><span class="p">*)</span> <span class="p">(</span><span class="n">ptr</span> <span class="p">+</span> <span class="m">0xB8</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>One again we begin by obtaining a pointer to the base of our module (<code class="language-plaintext highlighter-rouge">basePtr</code>), aka the beginning of the PE header. We then get the value of <code class="language-plaintext highlighter-rouge">e_lfanew</code> as described previously and assign its value plus <code class="language-plaintext highlighter-rouge">basePtr</code> to <code class="language-plaintext highlighter-rouge">ptr</code>. Next thing we aquire is the value of <code class="language-plaintext highlighter-rouge">Magic</code>, the first field of the optional header and assign it to <code class="language-plaintext highlighter-rouge">optMagic</code>. Depending on bitness the value of <code class="language-plaintext highlighter-rouge">Magic</code> is either <code class="language-plaintext highlighter-rouge">0x10b</code> for 32bit or <code class="language-plaintext highlighter-rouge">0x20b</code> for 64bit. Since the next value that we need is located in the optional header we need to determine which header is present (32bit header is smaller than 64bit header, which results in different offsets). Next we check if <code class="language-plaintext highlighter-rouge">optMagic</code> is not <code class="language-plaintext highlighter-rouge">0x20b</code>, if that is the case we assign the value located at <code class="language-plaintext highlighter-rouge">ptr</code> plus offset <code class="language-plaintext highlighter-rouge">0xA8</code> to <code class="language-plaintext highlighter-rouge">DebugVirtualAddress</code>. The pointer chain points to the location of <code class="language-plaintext highlighter-rouge">Debug Directory RVA</code> in the 32bit optional header. If <code class="language-plaintext highlighter-rouge">optMagic</code> is <code class="language-plaintext highlighter-rouge">0x20b</code> a different offset <code class="language-plaintext highlighter-rouge">0xB8</code> will be added to <code class="language-plaintext highlighter-rouge">ptr</code> which results in the value of <code class="language-plaintext highlighter-rouge">Debug Directory RVA</code> in the 64bit optional header getting assigned to <code class="language-plaintext highlighter-rouge">DebugVirtualAddress</code>.</p>
+
+<div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code>            <span class="n">basePtr</span> <span class="p">+=</span> <span class="n">DebugVirtualAddress</span><span class="p">;</span>
+            <span class="kt">uint</span> <span class="n">SizeOfData</span> <span class="p">=</span> <span class="p">*(</span><span class="kt">uint</span><span class="p">*)</span> <span class="p">(</span><span class="n">basePtr</span> <span class="p">+</span> <span class="m">0x10</span><span class="p">);</span>
+            <span class="kt">uint</span> <span class="n">AddressOfRawData</span> <span class="p">=</span> <span class="p">*(</span><span class="kt">uint</span><span class="p">*)</span> <span class="p">(</span><span class="n">basePtr</span> <span class="p">+</span> <span class="m">0x14</span><span class="p">);</span>
+            <span class="n">basePtr</span> <span class="p">-=</span> <span class="n">DebugVirtualAddress</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>After finding the relative virtual address (RVA) of the debug directory (stored in <code class="language-plaintext highlighter-rouge">DebugVirtualAddress</code>) we add it to <code class="language-plaintext highlighter-rouge">basePtr</code>. After we parse the first entry of the debug directory which is our payload, since in the stub generation we cleared the debug directory and added only our entry containing the payload. We only need 2 fields from the entry <code class="language-plaintext highlighter-rouge">SizeOfData</code> and <code class="language-plaintext highlighter-rouge">AddressOfRawData</code> to obtain them we apply an offset of <code class="language-plaintext highlighter-rouge">0x10</code> to <code class="language-plaintext highlighter-rouge">basePtr</code> since we added <code class="language-plaintext highlighter-rouge">DebugVirtualAddress</code> to <code class="language-plaintext highlighter-rouge">basePtr</code> it now points to the beginning of the debug directory. And the value at offset <code class="language-plaintext highlighter-rouge">0x10</code> in the debug directory entry is <code class="language-plaintext highlighter-rouge">SizeOfData</code>. Next we do the same for <code class="language-plaintext highlighter-rouge">AddressOfRawData</code> using the offset <code class="language-plaintext highlighter-rouge">0x14</code>. Once we have aquired these two values we subtract <code class="language-plaintext highlighter-rouge">DebugVirtualAddress</code> from <code class="language-plaintext highlighter-rouge">basePtr</code> to ensure its pointing to the beginning of the PE header again. That step is required since <code class="language-plaintext highlighter-rouge">AddressOfRawData</code> which is the location of our payload data, is relative to the base of the module.</p>
+
+<div class="language-csharp highlighter-rouge"><div class="highlight"><pre class="highlight"><code>            <span class="kt">byte</span><span class="p">[]</span> <span class="n">buffer</span> <span class="p">=</span> <span class="k">new</span> <span class="kt">byte</span><span class="p">[</span><span class="n">SizeOfData</span><span class="p">];</span>
+            <span class="n">basePtr</span> <span class="p">+=</span> <span class="n">AddressOfRawData</span><span class="p">;</span>
+            <span class="k">fixed</span> <span class="p">(</span><span class="kt">byte</span><span class="p">*</span> <span class="n">rawData</span> <span class="p">=</span> <span class="p">&amp;</span><span class="n">buffer</span><span class="p">[</span><span class="m">0</span><span class="p">])</span>
+            <span class="p">{</span>
+                <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="p">=</span> <span class="m">0</span><span class="p">;</span> <span class="n">i</span> <span class="p">&lt;</span> <span class="n">buffer</span><span class="p">.</span><span class="n">Length</span><span class="p">;</span> <span class="n">i</span><span class="p">++)</span>
+                <span class="p">{</span>
+                    <span class="p">*(</span><span class="n">rawData</span> <span class="p">+</span> <span class="n">i</span><span class="p">)</span> <span class="p">=</span> <span class="p">(</span><span class="kt">byte</span><span class="p">)</span> <span class="p">(*(</span><span class="n">basePtr</span> <span class="p">+</span> <span class="n">i</span><span class="p">)</span> <span class="p">^</span> <span class="n">name</span><span class="p">[</span><span class="n">i</span> <span class="p">%</span> <span class="n">name</span><span class="p">.</span><span class="n">Length</span><span class="p">]);</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+</code></pre></div></div>
+
+<p>This snippet is almost identical to the PE section loader except the location we copy the data from is aquired by adding <code class="language-plaintext highlighter-rouge">AddressOfRawData</code> to <code class="language-plaintext highlighter-rouge">basePtr</code> and we use <code class="language-plaintext highlighter-rouge">SizeOfData</code> to initialize our buffer byte array. The copying, decryption, decompression and invoking is done exactly the same way as in the PE section loader.</p>
+
+<h2 id="finnishing-the-packed-file">Finnishing the packed file</h2>
+
+<p>After all the above is done all thats left to do is writing our stub module to disk. Once the file is written to disk youve got your own packed version of the input file.</p>
+:ET
