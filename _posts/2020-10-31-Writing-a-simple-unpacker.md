@@ -73,8 +73,8 @@ Another example found in numerous forks of ConfuserEx is the locals to fields pr
 
 The examples I have found during my research mostly work somewhat like this:
 
-- OpCodes like stloc, ldloc and ldloca are replaced with their field equivalents stsfld, ldsfld, ldsflda`<br>`
-- The replacement fields are created in the global type¹, `<Module>` by default. These fields will have the attributes: public and static.`<br>`
+- OpCodes like stloc, ldloc and ldloca are replaced with their field equivalents stsfld, ldsfld, ldsflda
+- The replacement fields are created in the global type¹, `<Module>` by default. These fields will have the attributes: public and static.
 - (Optional) Sometimes one field is used to replace multiple locals of the same type, for example all locals of the type int are replaced with the same field.
 
 _<font size=2> 1. The fields could also be created in any other public type, but all forks I looked at used the global type. </font>_
@@ -180,7 +180,7 @@ In order to make this fixable by de4dot we will need to get rid of the `Math.Flo
 5. Invoke the method with the paramters obtained before
 6. Replace the call instruction with the OpCode related to the return type of our math function in this case ldc.r8 and set its operand to the result returned by the invoked method
 
-> 1. This will fail if the target app uses a different framework, to do it properly we would have to resolve the target framework and use its math class. Fix will be added later
+_<font size=2>1. This will fail if the target app uses a different framework, to do it properly we would have to resolve the target framework and use its math class. Fix will be added later</font>_
 
 My full code can be found [here](https://github.com/dr4k0nia/Unscrambler/blob/master/Unscrambler/Features/MethodFeatures/MathReplace.cs)
 
@@ -212,4 +212,3 @@ My full code can be found [here](https://github.com/dr4k0nia/Unscrambler/blob/ma
 
 - [AnonymooseRE](https://github.com/anonymoosere) For helping out with Unscrambler and answering a lot of my questions
 - [Washi](https://github.com/Washi1337/AsmResolver) For AsmResolver and answering my questions
-- [sharplab.io](https://sharplab.io) For their online compiler and IL view
