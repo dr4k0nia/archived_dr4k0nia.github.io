@@ -162,7 +162,7 @@ static string? Verify(string? input)
 
 We start with some basic checks that will abort the actual check if the key is null or not the correct length. The length check is already a hint to the reverser that the input needs to be the same length as `secret`. After these basic checks, we do some simple encryption using `input`. We iterate over each character of `input` performing some calculations then writing the result to `buffer`. 
 <br>
-We compare the encrypted result that is stored in `buffer` with `secret`, which is our password encrypted by the same cipher. We do that by defining the integer variable `sum` which is zero. We do a loop and XOR each char of `buffer` with the char at the same index in `secret`, since a number xored with itself is always zero the result will be zero if the characters match. We take the result to perform a logical AND operation with `sum`, which will change the value of `sum` should the result be non-zero. 
+We compare the encrypted result that is stored in `buffer` with `secret`, which is our password encrypted by the same cipher. We do that by defining the integer variable `sum` which is zero. We do a loop and XOR each char of `buffer` with the char at the same index in `secret`, since a number xored with itself is always zero the result will be zero if the characters match. We take the result to perform a logical OR operation with `sum`, which will change the value of `sum` should the result be non-zero. 
 <br>
 If `buffer` equals `secret` the value of `sum` stays zero and we return the value of `input` which will end the while loop seen in the main function and output the solution. If they do not match we simply return null and the while loop continues.
 

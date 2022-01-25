@@ -3,3 +3,16 @@
 
 //@import "minima/dracula-highlighting";
 //@import "minima/nord-highlighting";
+
+.footnotes {
+    // margin: auto;
+    // width: 60%;
+    font-size: 14px;
+}
+
+hr {
+    position: relative;
+    margin-top: 15px;
+    margin-bottom: 15px;
+    border: 1px solid $nord0;
+}
