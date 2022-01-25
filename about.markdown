@@ -19,7 +19,7 @@ staff member in 2019. Till this day I remain in the team as a file analyzer and 
 <br>
 My current interest is focussed arround cybersecurity especially malware analysis, AV/EDR evasion and use/abuse of C# in said topics.
 <br>
-I am enrolled in a German university studying computer science. Other interests include gaming, sports, formula one and listening to music.
+Other interests include gaming, sports, formula one and listening to music.
 
 
 ## Contact & Profiles
