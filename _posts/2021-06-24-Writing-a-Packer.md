@@ -27,11 +27,13 @@ We begin by parsing our input executable as raw data (bytes). For further proces
 The next step is building the stub executable, the stub is the part of the packer that unpacks the actual packed executable in memory. To run the unpacked executable from memory I will use simple Reflection invoking. First we create a new `ModuleDefinition` and pass the following arguments: payloads module name, payloads CorLib assembly as `AssemblyReference`. Once we created the module for the stub we will apply the previously mentioned info and custom attributes from our payload module.
 *Code reference can be found [here](https://github.com/dr4k0nia/Origami/blob/3131d4eb47856774618ee57a7342472d6ca2efa4/src/Packers/IPacker.cs#L33)*
 
-After that we will add the payload data to our stub (actually I inject the loader first but we will skip that for now, since the loader code requires a longer explanation). Before we add the payload data it will be compressed and encrypted with a single xor operation. For compression and decompression I use the .NET inbuilt `DeflateStream`. `<br/>`
-If the PE section mode was chosen we add a new `PESection` containing a `DataSegment` which holds our payload. The new `PESection` will be called `.origami`. The Characteristics need to include atleast the read access flag, I additonally apply the unintialized data flag.`<br/>`
+After that we will add the payload data to our stub (actually I inject the loader first but we will skip that for now, since the loader code requires a longer explanation). Before we add the payload data it will be compressed and encrypted with a single xor operation. For compression and decompression I use the .NET inbuilt `DeflateStream`.
+<br>
+If the PE section mode was chosen we add a new `PESection` containing a `DataSegment` which holds our payload. The new `PESection` will be called `.origami`. The Characteristics need to include atleast the read access flag, I additonally apply the unintialized data flag.
+<br>
 If the debug directory mode was chosen we clear the current debug directory and add a new `CustomDebugDataSegment` containing a `DataSegment` storing our payload instead of actual debug information. I will not go into detail explaining the code for this process as I think its fairly easy to understand, however the code references are included below if youre interested.
 
-*Code reference for the PE section packer can be found [here](https://github.com/dr4k0nia/Origami/blob/3131d4eb47856774618ee57a7342472d6ca2efa4/src/Packers/SectionPacker.cs)*`<br/>`
+*Code reference for the PE section packer can be found [here](https://github.com/dr4k0nia/Origami/blob/3131d4eb47856774618ee57a7342472d6ca2efa4/src/Packers/SectionPacker.cs)*<br>
 *Code reference for the debug directory packer can be found [here](https://github.com/dr4k0nia/Origami/blob/3131d4eb47856774618ee57a7342472d6ca2efa4/src/Packers/DebugDirPacker.cs)*
 
 Now to the step we skipped, injecting the loader code. The loader is the part that will unpack the payload at runtime.
@@ -57,11 +59,14 @@ This loader code will be used together with the additional PE section mentioned 
             ptr += 0x18 + optHeaderSize;
 ```
 
-Lets look at the `Main` method which will be injected into the stub and used as its EntryPoint. First we obtain a pointer to the base of our module (`basePtr`), aka the beginning of the PE header. After we assign `ptr` the value of `basePtr`. We then use the `ptr` variable to parse the relevant information for reading the sections from the PE header. `<br/>`
-Then we get the value of `e_lfanew` a field defined in the DOS header which indicates the address of the new executable header. The field is located at offset `0x3C`. The value of `e_lfanew` is by default `0x80` however it doesnt have to be since there are certain cases were additional data exists between DOS header and new executable header.`<br/>`
-After we added the value of `e_lfanew` to `ptr` we will go on to read the field `NumberOfSections` from the new executable header we obtain that value by adding the offset `0x6` to `ptr` and casting the pointer to an unsigned short pointer, the cast is required because `NumberOfSections` is of type `WORD` which in C# equals a `ushort`. We then dereference the casted pointer to aquire the value of `NumberOfSections` from the PE header and assign the value to our local called `NumberOfSections`.`<br/>`
+Lets look at the `Main` method which will be injected into the stub and used as its EntryPoint. First we obtain a pointer to the base of our module (`basePtr`), aka the beginning of the PE header. After we assign `ptr` the value of `basePtr`. We then use the `ptr` variable to parse the relevant information for reading the sections from the PE header.
+<br>
+Then we get the value of `e_lfanew` a field defined in the DOS header which indicates the address of the new executable header. The field is located at offset `0x3C`. The value of `e_lfanew` is by default `0x80` however it doesnt have to be since there are certain cases were additional data exists between DOS header and new executable header.
+<br>
+After we added the value of `e_lfanew` to `ptr` we will go on to read the field `NumberOfSections` from the new executable header we obtain that value by adding the offset `0x6` to `ptr` and casting the pointer to an unsigned short pointer, the cast is required because `NumberOfSections` is of type `WORD` which in C# equals a `ushort`. We then dereference the casted pointer to aquire the value of `NumberOfSections` from the PE header and assign the value to our local called `NumberOfSections`.
+<br>
 We repeat the above described but this time we add a different offset `0x14` to obtain the value of `SizeOfOptionalHeader`. This value is needed since the optional headers size changes depending on bitness. The 32bit optional header is slightly smaller than the 64bit optional header, which means following data differs in position depending on the size of the optional header. We assign the aquired value to `optHeaderSize`
-`<br/>`
+<br>
 
 ![header](/images/headerjump2.png)
 
