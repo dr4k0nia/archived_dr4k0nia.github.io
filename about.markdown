@@ -8,10 +8,10 @@ This is my personal blog that I use for write ups & other stuff im interested in
 
 ## About me
 
-I am a self taught hobby developer from Germany. I am currently enrolled in university studying computer science.
+I am a self taught hobby developer from Germany.
 I have experience in .NET, C++ and Java, my most used language is C#. I do regular reverse engineering for my position as a file analyzer at UnknownCheats.
 
-I began coding in 2014. Trough my older brother I learned about gamehacking which not soon after lead me to writing my own gamehacks.
+I began coding in 2014. Trough friends I learned about gamehacking which not soon after lead me to writing my own gamehacks.
 I also got into reverse engineering and soon found a fascination in code obfuscation and anti cheating software.
 <br>
 These special interests led me to UnknownCheats were I became a
