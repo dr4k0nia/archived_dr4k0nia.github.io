@@ -15,7 +15,7 @@ I began coding in 2014. Trough friends I learned about gamehacking which not soo
 I also got into reverse engineering and soon found a fascination in code obfuscation and anti cheating software.
 <br>
 These special interests led me to UnknownCheats were I became a
-staff member in 2019. I supported the team as a file analyzer and moderator until Summer 2022.
+staff member in 2019. I supported the team as a file analyzer and moderator until early summer 2022.
 <br>
 My current interest is focussed arround cybersecurity especially malware analysis, AV/EDR evasion and use/abuse of C# in said topics.
 <br>
