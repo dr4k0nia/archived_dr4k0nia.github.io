@@ -48,7 +48,7 @@ So in short: We can call every uniquely named method from the .net runtime using
 
 Another idea I got while browsing trough the internal parts of the managed .net runtime. There is a class called `Microsoft.Win32.Win32Native` which contains you guessed it managed wrappers for native functions. Since Microsoft already so kindly provides these wrappers it would be a waste to not use them. 
 
-There were 2 functions that I found especially interesting: `GetMethodHandle` and `GetProcAddress`. By invoking them we can without any usage of PInvoke in our binary get the address of any unmanaged function. Also by using the  delegate pointer type (`delegate*`) we can easily invoke the resolved unmanaged functions.
+There were 2 functions that I found especially interesting: `GetModuleHandle` and `GetProcAddress`. By invoking them we can without any usage of PInvoke in our binary get the address of any unmanaged function. Also by using the  delegate pointer type (`delegate*`) we can easily invoke the resolved unmanaged functions.
 
 ```csharp
             var module =
