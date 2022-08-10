@@ -52,7 +52,7 @@ There were 2 functions that I found especially interesting: `GetModuleHandle` an
 ```csharp
             var module =
                 HInvoke.InvokeMethod<IntPtr>(13239936, 811580934,
-                    new object[] {"kernel32.dll"}); // Microsoft.Win32.Win32Native.GetMethodHandle
+                    new object[] {"kernel32.dll"}); // Microsoft.Win32.Win32Native.GetModuleHandle
             var address =
                 HInvoke.InvokeMethod<IntPtr>(13239936, 1721745356,
                     new object[] {module, "IsDebuggerPresent"}); // Microsoft.Win32.Win32Native.GetProcAddress
