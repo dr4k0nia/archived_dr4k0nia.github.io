@@ -42,6 +42,7 @@ minima:
   social_links:
     github: dr4k0nia
     unknowncheats: drakonia
+    twitter: dr4k0nia
 plugins:
   - jekyll-sitemap
   - jekyll-feed
