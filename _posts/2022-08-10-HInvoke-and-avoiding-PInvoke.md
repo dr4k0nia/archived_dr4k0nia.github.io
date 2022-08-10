@@ -63,4 +63,6 @@ There were 2 functions that I found especially interesting: `GetModuleHandle` an
 
 The example shows a combination of using the Win32Native class and HInvoke to resolve the address of `kernel32!IsDebuggerPresent`. After it casts a delegate pointer with the unmanaged attribute, the calling convention and the returntype on the resolved address. Then calls it.
 
+You can find the full example code [here](https://gist.github.com/dr4k0nia/95bd2dc1cc09726f4aaaf920b9982f9d)
+
 This is a rather short post but hopefully interesting to some. For feedback or questions contact me on Twitter or Discord.
