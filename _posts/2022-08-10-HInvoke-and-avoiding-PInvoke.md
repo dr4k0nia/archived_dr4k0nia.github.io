@@ -38,10 +38,9 @@ Calls using HInvoke look like this
                 HInvoke.InvokeMethod(1174404872, 2029614223, new object[] {0}); // System.Environment.Exit(0)
 ```
 
-The HInvoke call requires the two before mentioned hashes, and additionally parameters for the method being called. The example is a common anti debug measure in .net obfuscators, only that this version does not expose the actual call on first glance.
+The HInvoke call requires the two before mentioned hashes, and additionally parameters for the method being called. The example is a common anti debug measure in .net obfuscators, only that this version does not expose the actual call on first glance. It checks the value of `Debugger.IsAttached` in case its true it calls `Environment.Exit` with parameter 0, closing the program.
 
 So in short: We can call every uniquely named method from the .net runtime using only 2 hashes.
-
 
 
 ## Avoiding Pinvoke
@@ -62,6 +61,6 @@ There were 2 functions that I found especially interesting: `GetModuleHandle` an
                 Console.WriteLine("Hey meanie I said no debugging :c");
 ```
 
-The example shows a combination of using the Win32Native class and HInvoke to resolve the address of `kernel32!IsDebuggerPresent`. For easier readability I did not add any additional obfuscation. Cast a delegate pointer with the unmanaged attribute, the calling convention and the returntype on the resolved address. Then call it.
+The example shows a combination of using the Win32Native class and HInvoke to resolve the address of `kernel32!IsDebuggerPresent`. After it casts a delegate pointer with the unmanaged attribute, the calling convention and the returntype on the resolved address. Then calls it.
 
 This is a rather short post but hopefully interesting to some. For feedback or questions contact me on Twitter or Discord.
