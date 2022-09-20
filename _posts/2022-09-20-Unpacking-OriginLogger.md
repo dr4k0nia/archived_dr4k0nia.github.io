@@ -5,8 +5,6 @@ date:   2022-09-20 16:46:24 +0200
 categories: dotnet reverse-engineering
 ---
 
-# Unpacking OriginLogger Builder
-
 OriginLogger is a keylogger that shares a lot of similarities with the well known Agent Tesla malware. Today I will take a look at their builder and unpack it. A little spoiler the sample used in this post was protected with a trial version of the commercial obfuscator Eazfuscator.NET which stops the binary from running due to the expired trial version...
 
 You can find the sample on [malshare](https://malshare.com/sample.php?action=detail&hash=595a7ea981a3948c4f387a5a6af54a70a41dd604685c72cbd2a55880c2b702ed)
