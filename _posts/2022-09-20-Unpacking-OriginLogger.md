@@ -1,3 +1,10 @@
+---
+layout: post
+title:  "Unpacking OriginLogger Builder"
+date:   2022-09-20 16:46:24 +0200
+categories: dotnet reverse-engineering
+---
+
 # Unpacking OriginLogger Builder
 
 OriginLogger is a keylogger that shares a lot of similarities with the well known Agent Tesla malware. Today I will take a look at their builder and unpack it. A little spoiler the sample used in this post was protected with a trial version of the commercial obfuscator Eazfuscator.NET which stops the binary from running due to the expired trial version...
@@ -28,7 +35,6 @@ Now open the saved module and patch both calls in the module constructor with a 
 
 ## Deobfuscating
 
-Next we will use [de4dot](https://github.com/de4dot/de4dot) to get rid of the unicode names. Simply drag & drop the dumped and patched binary into de4dot and let it do its work. After de4dot has finnished we are left with the string encryption for that we will use a tool called [eazfix](https://github.com/HoLLy-HaCKeR/EazFixer) make sure to use the `--keep-types` argument. Eazfix will decrypt the strings for us, if youre curious how it works it uses Harmony to patch the stackframe calls used by Eazfuscators string encryption. After patching the stackframe method to always return the string decryption method it can simply invoke the string decryption routine for each string and patch the call with the resulting string.
+Next we will use [de4dot](https://github.com/de4dot/de4dot) to get rid of the unicode names. Simply drag & drop the dumped and patched binary into de4dot and let it do its work. After de4dot has finished we are left with the string encryption for that we will use a tool called [eazfix](https://github.com/HoLLy-HaCKeR/EazFixer) make sure to use the `--keep-types` argument. Eazfix will decrypt the strings for us, if youre curious how it works it uses Harmony to patch the stackframe calls used by Eazfuscators string encryption. After patching the stackframe method to always return the string decryption method it can simply invoke the string decryption routine for each string and patch the call with the resulting string.
 
-After eazfixer is done you have a fully unpacked Origin Loader sample ;)
-
+As soon as eazfixer is done you have a fully unpacked Origin Loader sample ;)
