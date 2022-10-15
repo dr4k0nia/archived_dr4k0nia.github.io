@@ -5,7 +5,7 @@ date:   2022-10-15 21:27:24 +0200
 categories: dotnet coding
 ---
 
-Implementing custom string encryption for .NET binaries utilizing an XOR-based cipher and AsmResolver. Encrypting strings is a common practice to slow down static analysis or evade automatic analysis, in this blog post I will explain how I build my own binary-level string obfuscator in C# .NET 6.
+Implementing custom string encryption for .NET binaries utilizing an XOR-based cipher and AsmResolver. Encrypting strings is a common practice to slow down static analysis or evade automatic analysis, in this blog post I will explain how I build my own binary-level string obfuscator in C# .NET 6. The full code of the project can be found [here.](https://github.com/dr4k0nia/XorStringsNET)
 
 ## Concept and Structure
 
@@ -127,5 +127,3 @@ The last part is patching the placeholder values in the decryption method. For t
 Additionally, we also need to patch the placeholder for `cpblk` for that we simply resolve the call instruction which has the placeholder method as its operand and replace it with a `cpblk` instruction. We can then remove the placeholder method since it is no longer required.
 
 Once we have replaced all placeholders and removed the unused method, we can write the modified target binary to disk. You now have a binary with fully encrypted strings.
-
-The full code of the project can be found [here.](https://github.com/dr4k0nia/XorStringsNET)
