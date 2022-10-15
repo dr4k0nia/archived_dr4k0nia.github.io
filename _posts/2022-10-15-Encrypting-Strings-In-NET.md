@@ -33,7 +33,7 @@ My implementation is split into two projects. First, the runtime, which handles 
 
 ## The Runtime
 
-Starting with the runtime, the part responsible for decrypting strings in the obfuscated binary. I will be using an initialized struct for data storage, basically putting raw byte data into a struct. This method is quite appealing for obfuscation since dnSpy and other decompilers by default only show an empty struct with a fixed size but not the raw content. This means the byte array containing the encrypted string data is slightly less obvious to spot in a decompiler.
+Starting with the runtime, the part responsible for decrypting strings in the obfuscated binary. I will be using an initialized struct for data storage, basically putting raw byte data into a struct. This method is quite appealing for obfuscation since dnSpy and other decompilers by default only show a field and an empty struct with a fixed size but not the raw content. This means locating the encrypted string data is slightly harder in a standard .NET decompiler.
 
 The before-mentioned struct and decryption routine are part of the runtime project which is compiled using netstandard 2.0 to ensure compatibility with .NET Core and Framework at the same time. Since we do not know the contents of the struct before encrypting strings I use an empty placeholder struct which will be patched later by the obfuscator.
 
